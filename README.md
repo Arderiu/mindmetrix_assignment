@@ -71,6 +71,5 @@ The notebook pipeline is designed as a set of pure, stateless functions, which m
 
 **Inference endpoint.** A FastAPI service exposes a single `POST /session` endpoint. When a relaxation session ends, the wearable device (or a session-management service) sends the raw timeseries and subject metadata to this endpoint. The handler calls `preprocess()` followed by `build_feature_matrix()` to produce the same feature representation used during training, then loads the serialised scaler/PCA/K-Means to assign the subject to a relaxation profile cluster. The response returns the cluster label and key biomarker values (e.g. HR delta, pupil delta) for display in a clinician dashboard or mobile app.
 
-**Why the pipeline fits this pattern.** Every stage — `preprocess()`, `build_feature_matrix()`, `scale_features()` — takes a DataFrame and returns a DataFrame with no shared state. Feature column names are deterministic, so the offline-trained scaler will always align with features produced at inference time. This means the same `src/` modules used in the notebook are imported directly by the API with no adaptation.
 
 **Scaling.** For higher session throughput, the feature extraction step can be offloaded to a task queue (e.g. Celery with Redis) while the API layer remains lightweight and stateless, returning a job ID immediately and delivering results asynchronously.
