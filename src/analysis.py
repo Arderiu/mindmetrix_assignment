@@ -246,6 +246,52 @@ def spearman_with_pvalues(
     return corr_df, pval_df
 
 
+def kruskal_wallis_report(
+    df: pd.DataFrame,
+    feature_cols: list[str],
+    group_col: str,
+) -> pd.DataFrame:
+    """
+    Kruskal-Wallis H-test comparing feature distributions across 3+ groups.
+
+    Rationale
+    ---------
+    Kruskal-Wallis is the non-parametric equivalent of one-way ANOVA. It tests
+    whether at least one group has a different distribution from the others,
+    without assuming normality. Use this for categorical metadata with more than
+    two levels (e.g. BloodType: A, B, AB, O).
+
+    A significant result means at least one group differs — it does not identify
+    which pair. Post-hoc pairwise Mann-Whitney tests would be needed for that.
+
+    Parameters
+    ----------
+    group_col : str
+        Categorical column defining the groups (3+ levels).
+
+    Returns
+    -------
+    pd.DataFrame with columns: feature, groups, statistic, p_value, significant
+        sorted by p_value.
+    """
+    groups = sorted(df[group_col].dropna().unique())
+    rows = []
+    for feat in feature_cols:
+        samples = [df.loc[df[group_col] == g, feat].dropna().values for g in groups]
+        samples = [s for s in samples if len(s) >= 3]
+        if len(samples) < 2:
+            continue
+        result = stats.kruskal(*samples)
+        rows.append({
+            "feature": feat,
+            "groups": ", ".join(str(g) for g in groups),
+            "statistic": float(result.statistic),
+            "p_value": float(result.pvalue),
+            "significant": result.pvalue < 0.05,
+        })
+    return pd.DataFrame(rows).sort_values("p_value").reset_index(drop=True)
+
+
 def mann_whitney_report(
     df: pd.DataFrame,
     feature_cols: list[str],
