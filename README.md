@@ -37,7 +37,7 @@ jupyter notebook analysis.ipynb
 
 Run all cells top to bottom (**Kernel → Restart & Run All**). The notebook executes the full pipeline in order:
 
-1. **Preprocessing** — loads `data/timeseries.csv` and `data/subjects.csv`, removes duplicates, cleans physiological outliers.
+1. **Preprocessing** — loads `data/timeseries.csv` and `data/subjects.csv`, removes duplicates, cleans physiological outliers and tracking artifacts.
 2. **Feature extraction** — computes per-phase signal statistics, relaxation deltas, and cross-trial aggregates; produces one row per subject.
 3. **Biomarker sensitivity** — Wilcoxon signed-rank tests + Cohen's d for each signal across phases.
 4. **Metadata correlations** — Spearman correlations with STAI scores; Mann-Whitney U tests for binary demographic groups.

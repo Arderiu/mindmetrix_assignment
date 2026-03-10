@@ -7,6 +7,7 @@ Responsibilities:
     - Load raw CSV files
     - Remove duplicate timestamps
     - Ensure chronological ordering
+    - Replace tracking artifacts (invalid pupil diameter + associated gaze) with NaN
     - Replace physiologically impossible signal values with NaN
 
 Note: signal-quality flagging (PPG_SQI) and derived signal computation
@@ -98,37 +99,38 @@ def sort_timeseries(df: pd.DataFrame) -> pd.DataFrame:
     ).reset_index(drop=True)
 
 
-def clean_pupil_diameter(
+def clean_tracker_artifacts(
     df: pd.DataFrame,
     min_mm: float = PUPIL_MIN_MM,
     max_mm: float = PUPIL_MAX_MM,
 ) -> pd.DataFrame:
     """
-    Replace out-of-range PupilDiameter values with NaN.
+    Null out eye-tracker artefact frames (invalid pupil + associated gaze).
 
     Rationale
     ---------
-    The eye-tracker returns negative or near-zero values during blinks or
-    when the gaze goes off-screen (tracker loses the pupil). Extremely large
-    values indicate sensor glitches. Both are physiologically impossible and
-    would corrupt per-phase aggregations if kept.
+    The eye-tracker returns negative or near-zero PupilDiameter values during
+    blinks or when the gaze goes off-screen (tracker loses the pupil). Extremely
+    large values indicate sensor glitches. On these frames the gaze direction
+    vector (GazeX/Y/Z) is also unreliable, so all four columns are set to NaN
+    together.
 
-    Rows are NOT dropped — other signals (HR, motion, gaze) on the same
-    timestamp may still be valid.
+    Rows are NOT dropped — HR and motion signals on the same timestamp may
+    still be valid.
 
     Parameters
     ----------
     min_mm : float
-        Lower physiological bound (default 0.5 mm).
+        Lower physiological bound for PupilDiameter (default 0.5 mm).
     max_mm : float
-        Upper physiological bound (default 10.0 mm).
+        Upper physiological bound for PupilDiameter (default 10.0 mm).
     """
     df = df.copy()
     mask = (df["PupilDiameter"] < min_mm) | (df["PupilDiameter"] > max_mm)
     n_invalid = mask.sum()
-    df.loc[mask, "PupilDiameter"] = float("nan")
+    df.loc[mask, ["PupilDiameter", "GazeX", "GazeY", "GazeZ"]] = float("nan")
     print(
-        f"[clean] PupilDiameter out of [{min_mm}, {max_mm}] mm: "
+        f"[clean] Tracker artefact frames (PupilDiameter out of [{min_mm}, {max_mm}] mm): "
         f"{n_invalid} rows set to NaN ({100 * n_invalid / len(df):.2f}%)"
     )
     return df
@@ -182,7 +184,7 @@ def preprocess(ts_path: str, subjects_path: str) -> tuple[pd.DataFrame, pd.DataF
     1. Load raw CSVs
     2. Remove duplicate timestamps
     3. Sort chronologically
-    4. Replace invalid pupil diameter values with NaN
+    4. Null tracker artefact frames (invalid pupil + gaze)
     5. Replace invalid heart rate values with NaN
 
     Returns
@@ -195,6 +197,6 @@ def preprocess(ts_path: str, subjects_path: str) -> tuple[pd.DataFrame, pd.DataF
     ts, subjects = load_data(ts_path, subjects_path)
     ts = remove_duplicate_timestamps(ts)
     ts = sort_timeseries(ts)
-    ts = clean_pupil_diameter(ts)
+    ts = clean_tracker_artifacts(ts)
     ts = clean_heart_rate(ts)
     return ts, subjects
